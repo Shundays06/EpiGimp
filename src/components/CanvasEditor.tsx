@@ -22,8 +22,37 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPoint, setLastPoint] = useState<Point | null>(null);
   const [, setForceUpdate] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
   const activeLayer = layers.find((l) => l.id === activeLayerId);
+
+  // Keyboard shortcuts for zoom
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + or = to zoom in
+      if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
+        e.preventDefault();
+        setZoom((z) => Math.min(5, z + 0.1));
+      }
+      // Ctrl/Cmd - to zoom out
+      if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+        e.preventDefault();
+        setZoom((z) => Math.max(0.1, z - 0.1));
+      }
+      // Ctrl/Cmd 0 to reset zoom
+      if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault();
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     // Render all layers
@@ -62,14 +91,44 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
     
+    // Adjust for zoom and pan
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: (e.clientX - rect.left - pan.x) / zoom,
+      y: (e.clientY - rect.top - pan.y) / zoom,
     };
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    
+    // Zoom with mouse wheel
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const newZoom = Math.min(Math.max(0.1, zoom * delta), 5);
+    
+    // Zoom towards mouse position
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      
+      setPan({
+        x: mouseX - (mouseX - pan.x) * (newZoom / zoom),
+        y: mouseY - (mouseY - pan.y) * (newZoom / zoom),
+      });
+    }
+    
+    setZoom(newZoom);
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!activeLayer) return;
+    
+    // Pan with middle mouse button or space + left click
+    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+      return;
+    }
     
     const point = getMousePos(e);
 
@@ -87,6 +146,15 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Handle panning
+    if (isPanning) {
+      setPan({
+        x: e.clientX - panStart.x,
+        y: e.clientY - panStart.y,
+      });
+      return;
+    }
+    
     if (!isDrawing || !activeLayer || !lastPoint) return;
 
     const point = getMousePos(e);
@@ -99,6 +167,10 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   };
 
   const handleMouseUp = () => {
+    if (isPanning) {
+      setIsPanning(false);
+    }
+    
     if (isDrawing && activeLayer) {
       onLayerUpdate(activeLayer.id);
     }
@@ -186,20 +258,57 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   }
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-gray-900 overflow-auto">
-      <div
-        ref={containerRef}
-        className="relative bg-white shadow-2xl"
-        style={{
-          width: activeLayer.canvas.width,
-          height: activeLayer.canvas.height,
-          cursor: currentTool === 'brush' ? 'crosshair' : currentTool === 'eraser' ? 'cell' : currentTool === 'eyedropper' ? 'pointer' : 'default',
-        }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      />
+    <div className="flex-1 flex flex-col bg-gray-900 overflow-hidden">
+      {/* Zoom Controls */}
+      <div className="bg-gray-800 px-4 py-2 flex items-center gap-4 border-b border-gray-700">
+        <span className="text-white text-sm font-medium">Zoom:</span>
+        <button
+          onClick={() => setZoom(Math.max(0.1, zoom - 0.1))}
+          className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm"
+        >
+          −
+        </button>
+        <span className="text-white text-sm font-mono min-w-[60px] text-center">
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          onClick={() => setZoom(Math.min(5, zoom + 0.1))}
+          className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm"
+        >
+          +
+        </button>
+        <button
+          onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+        >
+          Réinitialiser
+        </button>
+        <span className="text-gray-400 text-xs ml-auto">
+          💡 Molette: Zoom | Shift+Clic: Déplacer
+        </span>
+      </div>
+
+      {/* Canvas Area */}
+      <div 
+        className="flex-1 flex items-center justify-center overflow-hidden"
+        onWheel={handleWheel}
+      >
+        <div
+          ref={containerRef}
+          className="relative bg-white shadow-2xl"
+          style={{
+            width: activeLayer.canvas.width,
+            height: activeLayer.canvas.height,
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: '0 0',
+            cursor: isPanning ? 'grabbing' : currentTool === 'brush' ? 'crosshair' : currentTool === 'eraser' ? 'cell' : currentTool === 'eyedropper' ? 'pointer' : 'default',
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        />
+      </div>
     </div>
   );
 };
