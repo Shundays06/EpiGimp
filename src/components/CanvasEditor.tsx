@@ -21,6 +21,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPoint, setLastPoint] = useState<Point | null>(null);
+  const [, setForceUpdate] = useState(0);
 
   const activeLayer = layers.find((l) => l.id === activeLayerId);
 
@@ -37,13 +38,22 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     // Add all visible layers
     layers.forEach((layer) => {
       if (layer.visible) {
-        const canvas = layer.canvas.cloneNode(true) as HTMLCanvasElement;
-        canvas.style.position = 'absolute';
-        canvas.style.top = '0';
-        canvas.style.left = '0';
-        canvas.style.opacity = layer.opacity.toString();
-        canvas.style.pointerEvents = layer.id === activeLayerId ? 'auto' : 'none';
-        container.appendChild(canvas);
+        // Create a new canvas and copy the content
+        const displayCanvas = document.createElement('canvas');
+        displayCanvas.width = layer.canvas.width;
+        displayCanvas.height = layer.canvas.height;
+        
+        const displayCtx = displayCanvas.getContext('2d');
+        if (displayCtx) {
+          displayCtx.drawImage(layer.canvas, 0, 0);
+        }
+        
+        displayCanvas.style.position = 'absolute';
+        displayCanvas.style.top = '0';
+        displayCanvas.style.left = '0';
+        displayCanvas.style.opacity = layer.opacity.toString();
+        displayCanvas.style.pointerEvents = layer.id === activeLayerId ? 'auto' : 'none';
+        container.appendChild(displayCanvas);
       }
     });
   }, [layers, activeLayerId]);
@@ -103,6 +113,9 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     ctx.beginPath();
     ctx.arc(point.x, point.y, brushSize / 2, 0, Math.PI * 2);
     ctx.fill();
+    
+    // Force update display
+    setForceUpdate(prev => prev + 1);
   };
 
   const drawLine = (from: Point, to: Point) => {
@@ -121,6 +134,9 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     ctx.moveTo(from.x, from.y);
     ctx.lineTo(to.x, to.y);
     ctx.stroke();
+    
+    // Force update display
+    setForceUpdate(prev => prev + 1);
   };
 
   const pickColor = (point: Point) => {
