@@ -71,13 +71,17 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!activeLayer) return;
     
-    setIsDrawing(true);
     const point = getMousePos(e);
-    setLastPoint(point);
 
     if (currentTool === 'eyedropper') {
       pickColor(point);
-    } else if (currentTool === 'brush' || currentTool === 'eraser') {
+      return; // Don't set isDrawing for eyedropper
+    }
+    
+    setIsDrawing(true);
+    setLastPoint(point);
+
+    if (currentTool === 'brush' || currentTool === 'eraser') {
       drawPoint(point);
     }
   };
@@ -142,13 +146,32 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const pickColor = (point: Point) => {
     if (!activeLayer) return;
 
-    const ctx = activeLayer.canvas.getContext('2d');
-    if (!ctx) return;
+    // Create a temporary canvas to merge all visible layers
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = activeLayer.canvas.width;
+    tempCanvas.height = activeLayer.canvas.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) return;
 
-    const pixel = ctx.getImageData(point.x, point.y, 1, 1).data;
-    const hex = `#${((1 << 24) + (pixel[0] << 16) + (pixel[1] << 8) + pixel[2])
-      .toString(16)
-      .slice(1)}`;
+    // Draw all visible layers
+    layers.forEach((layer) => {
+      if (layer.visible) {
+        tempCtx.globalAlpha = layer.opacity;
+        tempCtx.drawImage(layer.canvas, 0, 0);
+      }
+    });
+
+    // Get pixel color at the clicked position
+    const x = Math.floor(Math.max(0, Math.min(point.x, activeLayer.canvas.width - 1)));
+    const y = Math.floor(Math.max(0, Math.min(point.y, activeLayer.canvas.height - 1)));
+    const pixel = tempCtx.getImageData(x, y, 1, 1).data;
+    
+    // Convert to hex
+    const hex = `#${[pixel[0], pixel[1], pixel[2]]
+      .map(x => x.toString(16).padStart(2, '0'))
+      .join('')}`;
+    
+    console.log('Couleur capturée:', hex); // Pour debug
     
     // Dispatch custom event to update color
     window.dispatchEvent(new CustomEvent('colorPicked', { detail: hex }));

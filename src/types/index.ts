@@ -1,4 +1,4 @@
-export type Tool = 'brush' | 'eraser' | 'eyedropper' | 'select';
+export type Tool = 'brush' | 'eraser' | 'eyedropper';
 
 export interface Layer {
   id: string;

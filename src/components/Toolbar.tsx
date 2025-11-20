@@ -22,7 +22,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
     { id: 'brush', label: 'Pinceau', icon: '🖌️' },
     { id: 'eraser', label: 'Gomme', icon: '🧹' },
     { id: 'eyedropper', label: 'Pipette', icon: '💧' },
-    { id: 'select', label: 'Sélection', icon: '⬚' },
   ];
 
   return (
@@ -83,6 +82,25 @@ const Toolbar: React.FC<ToolbarProps> = ({
               </div>
             </div>
           )}
+        </div>
+      )}
+      
+      {/* Eyedropper Info */}
+      {selectedTool === 'eyedropper' && (
+        <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-gray-700">
+          <div className="bg-gray-700 p-3 rounded">
+            <p className="text-xs text-gray-400 mb-2">Couleur actuelle:</p>
+            <div className="flex gap-2 items-center">
+              <div 
+                className="w-12 h-12 rounded border-2 border-gray-600"
+                style={{ backgroundColor: brushColor }}
+              />
+              <span className="text-sm font-mono">{brushColor}</span>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              💡 Cliquez sur une couleur du canvas pour la capturer
+            </p>
+          </div>
         </div>
       )}
     </div>
