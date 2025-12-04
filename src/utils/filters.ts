@@ -67,15 +67,20 @@ const applyInvert = (data: Uint8ClampedArray) => {
 };
 
 const applyBrightness = (data: Uint8ClampedArray, value: number) => {
+  // value range: -100 to 100
+  const adjustment = (value / 100) * 255;
+  
   for (let i = 0; i < data.length; i += 4) {
-    data[i] = Math.max(0, Math.min(255, data[i] + value));
-    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + value));
-    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + value));
+    data[i] = Math.max(0, Math.min(255, data[i] + adjustment));
+    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + adjustment));
+    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + adjustment));
   }
 };
 
 const applyContrast = (data: Uint8ClampedArray, value: number) => {
-  const factor = (259 * (value + 255)) / (255 * (259 - value));
+  // value range: -100 to 100
+  const contrastValue = (value / 100) * 128;
+  const factor = (259 * (contrastValue + 255)) / (255 * (259 - contrastValue));
   
   for (let i = 0; i < data.length; i += 4) {
     data[i] = Math.max(0, Math.min(255, factor * (data[i] - 128) + 128));
@@ -85,6 +90,9 @@ const applyContrast = (data: Uint8ClampedArray, value: number) => {
 };
 
 const applySaturate = (data: Uint8ClampedArray, value: number) => {
+  // value range: 0 to 200 (50 = normal, <50 = desaturate, >50 = saturate)
+  const saturation = value / 50;
+  
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i];
     const g = data[i + 1];
@@ -92,9 +100,9 @@ const applySaturate = (data: Uint8ClampedArray, value: number) => {
     
     const gray = 0.2989 * r + 0.5870 * g + 0.1140 * b;
     
-    data[i] = Math.max(0, Math.min(255, gray + value * (r - gray)));
-    data[i + 1] = Math.max(0, Math.min(255, gray + value * (g - gray)));
-    data[i + 2] = Math.max(0, Math.min(255, gray + value * (b - gray)));
+    data[i] = Math.max(0, Math.min(255, gray + saturation * (r - gray)));
+    data[i + 1] = Math.max(0, Math.min(255, gray + saturation * (g - gray)));
+    data[i + 2] = Math.max(0, Math.min(255, gray + saturation * (b - gray)));
   }
 };
 
@@ -143,7 +151,8 @@ const applyBlur = (
 
 export const exportCanvas = (
   layers: HTMLCanvasElement[],
-  format: 'png' | 'jpeg' = 'png'
+  format: 'png' | 'jpeg' | 'webp' = 'png',
+  quality: number = 0.92
 ): string => {
   if (layers.length === 0) return '';
 
@@ -155,9 +164,16 @@ export const exportCanvas = (
   
   if (!ctx) return '';
 
+  // Fill with white background for JPEG (no transparency)
+  if (format === 'jpeg') {
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+  }
+
   layers.forEach(layer => {
     ctx.drawImage(layer, 0, 0);
   });
 
-  return exportCanvas.toDataURL(`image/${format}`);
+  const mimeType = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
+  return exportCanvas.toDataURL(mimeType, quality);
 };

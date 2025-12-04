@@ -11,13 +11,26 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageLoad }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/bmp'];
+    if (!validTypes.includes(file.type)) {
+      alert('Format de fichier non supporté. Veuillez utiliser PNG, JPEG, GIF, WebP ou BMP.');
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
         onImageLoad(img);
       };
+      img.onerror = () => {
+        alert('Erreur lors du chargement de l\'image. Veuillez réessayer.');
+      };
       img.src = event.target?.result as string;
+    };
+    reader.onerror = () => {
+      alert('Erreur lors de la lecture du fichier. Veuillez réessayer.');
     };
     reader.readAsDataURL(file);
   };
@@ -27,7 +40,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageLoad }) => {
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept=".png,.jpg,.jpeg,.gif,.webp,.bmp,image/png,image/jpeg,image/jpg,image/gif,image/webp,image/bmp"
         onChange={handleFileChange}
         className="hidden"
         id="image-upload"
@@ -39,7 +52,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageLoad }) => {
         Importer une image
       </label>
       <p className="text-gray-500 text-sm">
-        Formats supportés: PNG, JPEG, GIF, WebP
+        Formats supportés: PNG, JPEG, GIF, WebP, BMP
       </p>
     </div>
   );

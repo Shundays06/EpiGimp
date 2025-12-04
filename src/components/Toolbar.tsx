@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Tool } from '../types';
+import type { Tool, TextSettings } from '../types';
 
 interface ToolbarProps {
   selectedTool: Tool;
@@ -8,6 +8,8 @@ interface ToolbarProps {
   onBrushSizeChange: (size: number) => void;
   brushColor: string;
   onBrushColorChange: (color: string) => void;
+  textSettings?: TextSettings;
+  onTextSettingsChange?: (settings: TextSettings) => void;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -17,11 +19,25 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onBrushSizeChange,
   brushColor,
   onBrushColorChange,
+  textSettings,
+  onTextSettingsChange,
 }) => {
   const tools: { id: Tool; label: string; icon: string }[] = [
     { id: 'brush', label: 'Pinceau', icon: '🖌️' },
     { id: 'eraser', label: 'Gomme', icon: '🧹' },
     { id: 'eyedropper', label: 'Pipette', icon: '💧' },
+    { id: 'text', label: 'Texte', icon: '🔤' },
+  ];
+
+  const fontFamilies = [
+    'Arial',
+    'Helvetica',
+    'Times New Roman',
+    'Courier New',
+    'Georgia',
+    'Verdana',
+    'Comic Sans MS',
+    'Impact',
   ];
 
   return (
@@ -101,6 +117,95 @@ const Toolbar: React.FC<ToolbarProps> = ({
               💡 Cliquez sur une couleur du canvas pour la capturer
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Text Tool Settings */}
+      {selectedTool === 'text' && textSettings && onTextSettingsChange && (
+        <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-gray-700">
+          <div>
+            <label className="text-sm mb-2 block">Texte</label>
+            <input
+              type="text"
+              value={textSettings.text}
+              onChange={(e) => onTextSettingsChange({ ...textSettings, text: e.target.value })}
+              className="w-full bg-gray-700 px-3 py-2 rounded text-sm"
+              placeholder="Entrez votre texte..."
+            />
+          </div>
+
+          <div>
+            <label className="text-sm mb-2 block">Taille: {textSettings.fontSize}px</label>
+            <input
+              type="range"
+              min="12"
+              max="200"
+              value={textSettings.fontSize}
+              onChange={(e) => onTextSettingsChange({ ...textSettings, fontSize: Number(e.target.value) })}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm mb-2 block">Police</label>
+            <select
+              value={textSettings.fontFamily}
+              onChange={(e) => onTextSettingsChange({ ...textSettings, fontFamily: e.target.value })}
+              className="w-full bg-gray-700 px-3 py-2 rounded text-sm"
+            >
+              {fontFamilies.map((font) => (
+                <option key={font} value={font}>
+                  {font}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm mb-2 block">Couleur</label>
+            <div className="flex gap-2 items-center">
+              <input
+                type="color"
+                value={brushColor}
+                onChange={(e) => onBrushColorChange(e.target.value)}
+                className="w-12 h-12 rounded cursor-pointer"
+              />
+              <input
+                type="text"
+                value={brushColor}
+                onChange={(e) => onBrushColorChange(e.target.value)}
+                className="flex-1 bg-gray-700 px-2 py-1 rounded text-sm"
+                placeholder="#000000"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => onTextSettingsChange({ ...textSettings, bold: !textSettings.bold })}
+              className={`flex-1 px-3 py-2 rounded transition-colors font-bold ${
+                textSettings.bold
+                  ? 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-gray-700 hover:bg-gray-600'
+              }`}
+            >
+              B
+            </button>
+            <button
+              onClick={() => onTextSettingsChange({ ...textSettings, italic: !textSettings.italic })}
+              className={`flex-1 px-3 py-2 rounded transition-colors italic ${
+                textSettings.italic
+                  ? 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-gray-700 hover:bg-gray-600'
+              }`}
+            >
+              I
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-400">
+            💡 Cliquez sur le canvas pour placer le texte
+          </p>
         </div>
       )}
     </div>

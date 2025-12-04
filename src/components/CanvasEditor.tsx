@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import type { Layer, Tool, Point } from '../types';
+import type { Layer, Tool, Point, TextSettings } from '../types';
 
 interface CanvasEditorProps {
   layers: Layer[];
@@ -8,6 +8,7 @@ interface CanvasEditorProps {
   brushSize: number;
   brushColor: string;
   onLayerUpdate: (layerId: string) => void;
+  textSettings?: TextSettings;
 }
 
 const CanvasEditor: React.FC<CanvasEditorProps> = ({
@@ -17,6 +18,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   brushSize,
   brushColor,
   onLayerUpdate,
+  textSettings,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -136,6 +138,11 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       pickColor(point);
       return; // Don't set isDrawing for eyedropper
     }
+
+    if (currentTool === 'text' && textSettings) {
+      drawText(point);
+      return; // Don't set isDrawing for text tool
+    }
     
     setIsDrawing(true);
     setLastPoint(point);
@@ -247,6 +254,31 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     
     // Dispatch custom event to update color
     window.dispatchEvent(new CustomEvent('colorPicked', { detail: hex }));
+  };
+
+  const drawText = (point: Point) => {
+    if (!activeLayer || !textSettings) return;
+
+    const ctx = activeLayer.canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Build font style string
+    let fontStyle = '';
+    if (textSettings.italic) fontStyle += 'italic ';
+    if (textSettings.bold) fontStyle += 'bold ';
+    
+    ctx.font = `${fontStyle}${textSettings.fontSize}px ${textSettings.fontFamily}`;
+    ctx.fillStyle = brushColor;
+    ctx.textBaseline = 'top';
+    
+    // Draw text
+    ctx.fillText(textSettings.text, point.x, point.y);
+    
+    // Update layer
+    onLayerUpdate(activeLayer.id);
+    
+    // Force update display
+    setForceUpdate(prev => prev + 1);
   };
 
   if (layers.length === 0 || !activeLayer) {

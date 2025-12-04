@@ -4,7 +4,8 @@ import Toolbar from './components/Toolbar';
 import LayersPanel from './components/LayersPanel';
 import CanvasEditor from './components/CanvasEditor';
 import FiltersPanel from './components/FiltersPanel';
-import type { Layer, Tool } from './types';
+import type { Layer, Tool, TextSettings } from './types';
+import { useHistory } from './hooks/useHistory';
 import './App.css';
 
 function App() {
@@ -14,6 +15,16 @@ function App() {
   const [brushSize, setBrushSize] = useState(5);
   const [brushColor, setBrushColor] = useState('#000000');
   const [showUploader, setShowUploader] = useState(true);
+  const [textSettings, setTextSettings] = useState<TextSettings>({
+    text: 'Votre texte',
+    fontSize: 32,
+    fontFamily: 'Arial',
+    color: '#000000',
+    bold: false,
+    italic: false,
+  });
+  
+  const { saveState, undo, redo, canUndo, canRedo, clear: clearHistory } = useHistory();
 
   // Listen for color picker events
   useEffect(() => {
@@ -25,6 +36,25 @@ function App() {
     window.addEventListener('colorPicked', handleColorPicked);
     return () => window.removeEventListener('colorPicked', handleColorPicked);
   }, []);
+
+  // Handle Undo/Redo keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + Z for Undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      // Ctrl/Cmd + Shift + Z or Ctrl/Cmd + Y for Redo
+      if ((e.ctrlKey || e.metaKey) && (e.shiftKey && e.key === 'z' || e.key === 'y')) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [layers, activeLayerId]);
 
   const handleImageLoad = (img: HTMLImageElement) => {
     const canvas = document.createElement('canvas');
@@ -102,6 +132,9 @@ function App() {
     const layer = layers.find((l) => l.id === layerId);
     if (!layer) return;
 
+    // Save to history before updating
+    saveState(layerId, layer.canvas);
+
     const thumbnail = layer.canvas.toDataURL('image/png', 0.1);
     setLayers(
       layers.map((l) =>
@@ -110,10 +143,39 @@ function App() {
     );
   };
 
+  const handleUndo = () => {
+    const state = undo();
+    if (!state) return;
+
+    const layer = layers.find((l) => l.id === state.layerId);
+    if (!layer) return;
+
+    const ctx = layer.canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.putImageData(state.imageData, 0, 0);
+    handleLayerUpdate(state.layerId);
+  };
+
+  const handleRedo = () => {
+    const state = redo();
+    if (!state) return;
+
+    const layer = layers.find((l) => l.id === state.layerId);
+    if (!layer) return;
+
+    const ctx = layer.canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.putImageData(state.imageData, 0, 0);
+    handleLayerUpdate(state.layerId);
+  };
+
   const handleReset = () => {
     setLayers([]);
     setActiveLayerId('');
     setShowUploader(true);
+    clearHistory();
   };
 
   return (
@@ -123,12 +185,38 @@ function App() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">🎨 EpiGimp</h1>
           {layers.length > 0 && (
-            <button
-              onClick={handleReset}
-              className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded transition-colors text-sm"
-            >
-              Nouveau projet
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleUndo}
+                disabled={!canUndo}
+                className={`px-4 py-2 rounded transition-colors text-sm ${
+                  canUndo
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-gray-600 cursor-not-allowed opacity-50'
+                }`}
+                title="Annuler (Ctrl+Z)"
+              >
+                ↶ Annuler
+              </button>
+              <button
+                onClick={handleRedo}
+                disabled={!canRedo}
+                className={`px-4 py-2 rounded transition-colors text-sm ${
+                  canRedo
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-gray-600 cursor-not-allowed opacity-50'
+                }`}
+                title="Rétablir (Ctrl+Shift+Z)"
+              >
+                ↷ Rétablir
+              </button>
+              <button
+                onClick={handleReset}
+                className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded transition-colors text-sm"
+              >
+                Nouveau projet
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -150,6 +238,8 @@ function App() {
                 onBrushSizeChange={setBrushSize}
                 brushColor={brushColor}
                 onBrushColorChange={setBrushColor}
+                textSettings={textSettings}
+                onTextSettingsChange={setTextSettings}
               />
             </aside>
 
@@ -162,6 +252,7 @@ function App() {
                 brushSize={brushSize}
                 brushColor={brushColor}
                 onLayerUpdate={handleLayerUpdate}
+                textSettings={textSettings}
               />
             </main>
 
