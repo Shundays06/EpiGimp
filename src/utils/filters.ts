@@ -151,7 +151,7 @@ const applyBlur = (
 
 export const exportCanvas = (
   layers: HTMLCanvasElement[],
-  format: 'png' | 'jpeg' | 'webp' = 'png',
+  format: 'png' | 'jpeg' | 'webp' | 'bmp' | 'gif' = 'png',
   quality: number = 0.92
 ): string => {
   if (layers.length === 0) return '';
@@ -164,8 +164,8 @@ export const exportCanvas = (
   
   if (!ctx) return '';
 
-  // Fill with white background for JPEG (no transparency)
-  if (format === 'jpeg') {
+  // Fill with white background for formats without transparency (JPEG, BMP)
+  if (format === 'jpeg' || format === 'bmp') {
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
   }
@@ -174,6 +174,12 @@ export const exportCanvas = (
     ctx.drawImage(layer, 0, 0);
   });
 
-  const mimeType = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
+  // Map format to MIME type
+  let mimeType = 'image/png';
+  if (format === 'jpeg') mimeType = 'image/jpeg';
+  else if (format === 'webp') mimeType = 'image/webp';
+  else if (format === 'bmp') mimeType = 'image/bmp';
+  else if (format === 'gif') mimeType = 'image/gif';
+  
   return exportCanvas.toDataURL(mimeType, quality);
 };
