@@ -1,4 +1,4 @@
-export type Tool = 'brush' | 'eraser' | 'eyedropper' | 'text';
+export type Tool = 'brush' | 'eraser' | 'eyedropper' | 'text' | 'move';
 
 export interface Layer {
   id: string;
@@ -7,6 +7,26 @@ export interface Layer {
   opacity: number;
   canvas: HTMLCanvasElement;
   thumbnail?: string;
+  type?: 'image' | 'text';
+  textData?: {
+    content: string;
+    x: number;
+    y: number;
+    fontSize: number;
+    fontFamily: string;
+    color: string;
+    bold: boolean;
+    italic: boolean;
+  };
+  position?: {
+    x: number;
+    y: number;
+  };
+  transform?: {
+    scaleX: number;
+    scaleY: number;
+    rotation: number;
+  };
 }
 
 export interface BrushSettings {
@@ -16,10 +36,8 @@ export interface BrushSettings {
 }
 
 export interface TextSettings {
-  text: string;
   fontSize: number;
   fontFamily: string;
-  color: string;
   bold: boolean;
   italic: boolean;
 }

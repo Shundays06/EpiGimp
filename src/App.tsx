@@ -16,10 +16,8 @@ function App() {
   const [brushColor, setBrushColor] = useState('#000000');
   const [showUploader, setShowUploader] = useState(true);
   const [textSettings, setTextSettings] = useState<TextSettings>({
-    text: 'Votre texte',
     fontSize: 32,
     fontFamily: 'Arial',
-    color: '#000000',
     bold: false,
     italic: false,
   });
@@ -100,6 +98,123 @@ function App() {
     setActiveLayerId(newLayer.id);
   };
 
+  const handleAddTextLayer = (textContent: string, x: number, y: number, fontSize: number, color: string) => {
+    if (layers.length === 0) return;
+
+    const baseLayer = layers[0];
+    const canvas = document.createElement('canvas');
+    canvas.width = baseLayer.canvas.width;
+    canvas.height = baseLayer.canvas.height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    console.log('Adding text layer:', { textContent, x, y, fontSize, color });
+
+    // Draw the text on the new layer
+    let fontStyle = '';
+    if (textSettings.italic) fontStyle += 'italic ';
+    if (textSettings.bold) fontStyle += 'bold ';
+    
+    ctx.font = `${fontStyle}${fontSize}px ${textSettings.fontFamily}`;
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'top';
+    
+    console.log('Font settings:', ctx.font, 'Color:', ctx.fillStyle);
+    
+    // Draw text with multiple lines support
+    const lines = textContent.split('\n');
+    lines.forEach((line, index) => {
+      const yPos = y + (index * fontSize * 1.2);
+      console.log(`Drawing line "${line}" at (${x}, ${yPos})`);
+      ctx.fillText(line, x, yPos);
+    });
+
+    // Generate thumbnail after drawing
+    const thumbnail = canvas.toDataURL('image/png', 0.1);
+    console.log('Thumbnail generated, length:', thumbnail.length);
+
+    const newLayer: Layer = {
+      id: Date.now().toString(),
+      name: `Texte ${layers.length + 1}`,
+      visible: true,
+      opacity: 1,
+      canvas,
+      thumbnail,
+      type: 'text',
+      textData: {
+        content: textContent,
+        x,
+        y,
+        fontSize: fontSize,
+        fontFamily: textSettings.fontFamily,
+        color: color,
+        bold: textSettings.bold,
+        italic: textSettings.italic,
+      },
+      position: { x: 0, y: 0 },
+    };
+
+    console.log('New layer created:', newLayer.name, 'Canvas size:', canvas.width, 'x', canvas.height);
+
+    setLayers([...layers, newLayer]);
+    setActiveLayerId(newLayer.id);
+  };
+
+  const handleUpdateTextLayer = (layerId: string, newTextData: Partial<Layer['textData']>) => {
+    const layer = layers.find(l => l.id === layerId);
+    if (!layer || layer.type !== 'text' || !layer.textData) return;
+
+    // Merge old and new text data
+    const updatedTextData = { ...layer.textData, ...newTextData };
+
+    // Redraw canvas with new text
+    const ctx = layer.canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
+
+    // Draw text with new settings
+    let fontStyle = '';
+    if (updatedTextData.italic) fontStyle += 'italic ';
+    if (updatedTextData.bold) fontStyle += 'bold ';
+    
+    ctx.font = `${fontStyle}${updatedTextData.fontSize}px ${updatedTextData.fontFamily}`;
+    ctx.fillStyle = updatedTextData.color;
+    ctx.textBaseline = 'top';
+    
+    const lines = updatedTextData.content.split('\n');
+    lines.forEach((line, index) => {
+      const yPos = updatedTextData.y + (index * updatedTextData.fontSize * 1.2);
+      ctx.fillText(line, updatedTextData.x, yPos);
+    });
+
+    // Update layer
+    const thumbnail = layer.canvas.toDataURL('image/png', 0.1);
+    setLayers(layers.map(l => 
+      l.id === layerId 
+        ? { ...l, textData: updatedTextData, thumbnail }
+        : l
+    ));
+  };
+
+  const handleMoveLayer = (layerId: string, deltaX: number, deltaY: number) => {
+    setLayers(layers.map(l => {
+      if (l.id === layerId) {
+        const currentPos = l.position || { x: 0, y: 0 };
+        return {
+          ...l,
+          position: {
+            x: currentPos.x + deltaX,
+            y: currentPos.y + deltaY,
+          }
+        };
+      }
+      return l;
+    }));
+  };
+
   const handleLayerDelete = (id: string) => {
     if (layers.length <= 1) return;
 
@@ -132,15 +247,20 @@ function App() {
     const layer = layers.find((l) => l.id === layerId);
     if (!layer) return;
 
-    // Save to history before updating
-    saveState(layerId, layer.canvas);
-
     const thumbnail = layer.canvas.toDataURL('image/png', 0.1);
     setLayers(
       layers.map((l) =>
         l.id === layerId ? { ...l, thumbnail } : l
       )
     );
+  };
+
+  const handleBeforeLayerModify = (layerId: string) => {
+    // Save state BEFORE modification for undo/redo
+    const layer = layers.find((l) => l.id === layerId);
+    if (!layer) return;
+    
+    saveState(layerId, layer.canvas);
   };
 
   const handleUndo = () => {
@@ -154,7 +274,14 @@ function App() {
     if (!ctx) return;
 
     ctx.putImageData(state.imageData, 0, 0);
-    handleLayerUpdate(state.layerId);
+    
+    // Update thumbnail without saving to history
+    const thumbnail = layer.canvas.toDataURL('image/png', 0.1);
+    setLayers(
+      layers.map((l) =>
+        l.id === state.layerId ? { ...l, thumbnail } : l
+      )
+    );
   };
 
   const handleRedo = () => {
@@ -168,7 +295,14 @@ function App() {
     if (!ctx) return;
 
     ctx.putImageData(state.imageData, 0, 0);
-    handleLayerUpdate(state.layerId);
+    
+    // Update thumbnail without saving to history
+    const thumbnail = layer.canvas.toDataURL('image/png', 0.1);
+    setLayers(
+      layers.map((l) =>
+        l.id === state.layerId ? { ...l, thumbnail } : l
+      )
+    );
   };
 
   const handleReset = () => {
@@ -252,6 +386,10 @@ function App() {
                 brushSize={brushSize}
                 brushColor={brushColor}
                 onLayerUpdate={handleLayerUpdate}
+                onBeforeLayerModify={handleBeforeLayerModify}
+                onAddTextLayer={handleAddTextLayer}
+                onUpdateTextLayer={handleUpdateTextLayer}
+                onMoveLayer={handleMoveLayer}
                 textSettings={textSettings}
               />
             </main>

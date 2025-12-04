@@ -26,6 +26,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     { id: 'brush', label: 'Pinceau', icon: '🖌️' },
     { id: 'eraser', label: 'Gomme', icon: '🧹' },
     { id: 'eyedropper', label: 'Pipette', icon: '💧' },
+    { id: 'move', label: 'Déplacer', icon: '✋' },
     { id: 'text', label: 'Texte', icon: '🔤' },
   ];
 
@@ -119,21 +120,25 @@ const Toolbar: React.FC<ToolbarProps> = ({
           </div>
         </div>
       )}
+      
+      {/* Move Tool Info */}
+      {selectedTool === 'move' && (
+        <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-gray-700">
+          <div className="bg-gray-700 p-3 rounded">
+            <p className="text-xs text-gray-400 mb-2">Outil de déplacement</p>
+            <p className="text-xs text-gray-400">
+              💡 Cliquez et glissez pour déplacer le calque actif
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              🔤 Double-cliquez sur un calque de texte pour l'éditer
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Text Tool Settings */}
       {selectedTool === 'text' && textSettings && onTextSettingsChange && (
         <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-gray-700">
-          <div>
-            <label className="text-sm mb-2 block">Texte</label>
-            <input
-              type="text"
-              value={textSettings.text}
-              onChange={(e) => onTextSettingsChange({ ...textSettings, text: e.target.value })}
-              className="w-full bg-gray-700 px-3 py-2 rounded text-sm"
-              placeholder="Entrez votre texte..."
-            />
-          </div>
-
           <div>
             <label className="text-sm mb-2 block">Taille: {textSettings.fontSize}px</label>
             <input
@@ -204,7 +209,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           </div>
 
           <p className="text-xs text-gray-400">
-            💡 Cliquez sur le canvas pour placer le texte
+            💡 Cliquez sur le canvas pour ajouter un nouveau calque de texte
           </p>
         </div>
       )}

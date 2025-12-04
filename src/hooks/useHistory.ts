@@ -30,13 +30,16 @@ export const useHistory = (maxHistorySize: number = 50) => {
       // Limit history size
       if (newHistory.length > maxHistorySize) {
         newHistory.shift();
-        setCurrentIndex(prev => prev - 1);
+        return newHistory;
       }
 
       return newHistory;
     });
 
-    setCurrentIndex(prev => Math.min(prev + 1, maxHistorySize - 1));
+    setCurrentIndex(prev => {
+      const newIndex = prev + 1;
+      return newIndex >= maxHistorySize ? maxHistorySize - 1 : newIndex;
+    });
   }, [currentIndex, maxHistorySize]);
 
   const undo = useCallback((): HistoryEntry | null => {
@@ -70,5 +73,7 @@ export const useHistory = (maxHistorySize: number = 50) => {
     canUndo,
     canRedo,
     clear,
+    historyLength: history.length,
+    currentIndex,
   };
 };

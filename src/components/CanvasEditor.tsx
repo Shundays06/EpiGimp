@@ -8,6 +8,10 @@ interface CanvasEditorProps {
   brushSize: number;
   brushColor: string;
   onLayerUpdate: (layerId: string) => void;
+  onBeforeLayerModify: (layerId: string) => void;
+  onAddTextLayer: (textContent: string, x: number, y: number, fontSize: number, color: string) => void;
+  onUpdateTextLayer: (layerId: string, newTextData: Partial<Layer['textData']>) => void;
+  onMoveLayer: (layerId: string, deltaX: number, deltaY: number) => void;
   textSettings?: TextSettings;
 }
 
@@ -18,16 +22,26 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   brushSize,
   brushColor,
   onLayerUpdate,
+  onBeforeLayerModify,
+  onAddTextLayer,
+  onUpdateTextLayer,
+  onMoveLayer,
   textSettings,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPoint, setLastPoint] = useState<Point | null>(null);
-  const [, setForceUpdate] = useState(0);
+  const [forceUpdate, setForceUpdate] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [showTextInput, setShowTextInput] = useState(false);
+  const [textInputValue, setTextInputValue] = useState('');
+  const [pendingTextPosition, setPendingTextPosition] = useState<Point | null>(null);
+  const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
+  const [textColor, setTextColor] = useState('#000000');
+  const [textSize, setTextSize] = useState(32);
 
   const activeLayer = layers.find((l) => l.id === activeLayerId);
 
@@ -61,13 +75,23 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     const container = containerRef.current;
     if (!container) return;
 
+    console.log('Rendering layers:', layers.length, 'layers');
+
     // Clear container
     while (container.firstChild) {
       container.removeChild(container.firstChild);
     }
 
     // Add all visible layers
-    layers.forEach((layer) => {
+    layers.forEach((layer, index) => {
+      console.log(`Layer ${index} (${layer.name}):`, {
+        visible: layer.visible,
+        width: layer.canvas.width,
+        height: layer.canvas.height,
+        opacity: layer.opacity,
+        position: layer.position
+      });
+      
       if (layer.visible) {
         // Create a new canvas and copy the content
         const displayCanvas = document.createElement('canvas');
@@ -79,15 +103,23 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
           displayCtx.drawImage(layer.canvas, 0, 0);
         }
         
+        const layerPos = layer.position || { x: 0, y: 0 };
+        const layerTransform = layer.transform || { scaleX: 1, scaleY: 1, rotation: 0 };
+        const cursorStyle = isPanning ? 'grabbing' : currentTool === 'brush' ? 'crosshair' : currentTool === 'eraser' ? 'cell' : currentTool === 'eyedropper' ? 'pointer' : currentTool === 'text' ? 'text' : currentTool === 'move' ? 'move' : 'default';
+        
         displayCanvas.style.position = 'absolute';
         displayCanvas.style.top = '0';
         displayCanvas.style.left = '0';
+        displayCanvas.style.transform = `translate(${layerPos.x}px, ${layerPos.y}px) scale(${layerTransform.scaleX}, ${layerTransform.scaleY})`;
+        displayCanvas.style.transformOrigin = '0 0';
         displayCanvas.style.opacity = layer.opacity.toString();
         displayCanvas.style.pointerEvents = layer.id === activeLayerId ? 'auto' : 'none';
+        displayCanvas.style.cursor = cursorStyle;
+        
         container.appendChild(displayCanvas);
       }
     });
-  }, [layers, activeLayerId]);
+  }, [layers, activeLayerId, forceUpdate, currentTool, isPanning]);
 
   const getMousePos = (e: React.MouseEvent<HTMLDivElement>): Point => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -134,15 +166,42 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     
     const point = getMousePos(e);
 
-    if (currentTool === 'eyedropper') {
-      pickColor(point);
-      return; // Don't set isDrawing for eyedropper
+    // Double-click on text layer to edit it (works with any tool)
+    if (e.detail === 2 && activeLayer.type === 'text' && activeLayer.textData) {
+      setEditingLayerId(activeLayer.id);
+      setPendingTextPosition({ x: activeLayer.textData.x, y: activeLayer.textData.y });
+      setTextInputValue(activeLayer.textData.content);
+      setTextSize(activeLayer.textData.fontSize);
+      setTextColor(activeLayer.textData.color);
+      setShowTextInput(true);
+      return;
     }
 
-    if (currentTool === 'text' && textSettings) {
-      drawText(point);
-      return; // Don't set isDrawing for text tool
+    if (currentTool === 'eyedropper') {
+      pickColor(point);
+      return;
     }
+
+    if (currentTool === 'text') {
+      // Single click with text tool: create new text
+      setEditingLayerId(null);
+      setPendingTextPosition(point);
+      setTextInputValue('');
+      setTextSize(textSettings?.fontSize || 32);
+      setTextColor(brushColor);
+      setShowTextInput(true);
+      return;
+    }
+
+    if (currentTool === 'move') {
+      // Start moving the active layer
+      setIsDrawing(true);
+      setLastPoint(point);
+      return;
+    }
+    
+    // Save state BEFORE making any modifications
+    onBeforeLayerModify(activeLayer.id);
     
     setIsDrawing(true);
     setLastPoint(point);
@@ -166,8 +225,19 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
     const point = getMousePos(e);
 
+    if (currentTool === 'move') {
+      // Move the active layer
+      const deltaX = point.x - lastPoint.x;
+      const deltaY = point.y - lastPoint.y;
+      onMoveLayer(activeLayer.id, deltaX, deltaY);
+      setLastPoint(point);
+      return;
+    }
+
     if (currentTool === 'brush' || currentTool === 'eraser') {
       drawLine(lastPoint, point);
+      // Force re-render to show drawing in real-time
+      setForceUpdate(prev => prev + 1);
     }
 
     setLastPoint(point);
@@ -256,29 +326,36 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     window.dispatchEvent(new CustomEvent('colorPicked', { detail: hex }));
   };
 
-  const drawText = (point: Point) => {
-    if (!activeLayer || !textSettings) return;
+  const handleTextSubmit = () => {
+    if (pendingTextPosition && textInputValue.trim()) {
+      console.log('Submitting text:', textInputValue, 'at position:', pendingTextPosition, 'size:', textSize, 'color:', textColor);
+      
+      // Check if we're editing an existing text layer
+      if (editingLayerId) {
+        // Update existing text layer
+        onUpdateTextLayer(editingLayerId, {
+          content: textInputValue,
+          x: pendingTextPosition.x,
+          y: pendingTextPosition.y,
+          fontSize: textSize,
+          color: textColor,
+        });
+      } else {
+        // Create a new text layer with custom size and color from the modal
+        onAddTextLayer(textInputValue, pendingTextPosition.x, pendingTextPosition.y, textSize, textColor);
+      }
+    }
+    setShowTextInput(false);
+    setTextInputValue('');
+    setPendingTextPosition(null);
+    setEditingLayerId(null);
+  };
 
-    const ctx = activeLayer.canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Build font style string
-    let fontStyle = '';
-    if (textSettings.italic) fontStyle += 'italic ';
-    if (textSettings.bold) fontStyle += 'bold ';
-    
-    ctx.font = `${fontStyle}${textSettings.fontSize}px ${textSettings.fontFamily}`;
-    ctx.fillStyle = brushColor;
-    ctx.textBaseline = 'top';
-    
-    // Draw text
-    ctx.fillText(textSettings.text, point.x, point.y);
-    
-    // Update layer
-    onLayerUpdate(activeLayer.id);
-    
-    // Force update display
-    setForceUpdate(prev => prev + 1);
+  const handleTextCancel = () => {
+    setShowTextInput(false);
+    setTextInputValue('');
+    setPendingTextPosition(null);
+    setEditingLayerId(null);
   };
 
   if (layers.length === 0 || !activeLayer) {
@@ -333,7 +410,6 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
             height: activeLayer.canvas.height,
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: '0 0',
-            cursor: isPanning ? 'grabbing' : currentTool === 'brush' ? 'crosshair' : currentTool === 'eraser' ? 'cell' : currentTool === 'eyedropper' ? 'pointer' : 'default',
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -341,6 +417,82 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
           onMouseLeave={handleMouseUp}
         />
       </div>
+
+      {/* Text Input Modal */}
+      {showTextInput && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-white text-lg font-bold mb-4">
+              {editingLayerId ? 'Modifier le texte' : 'Ajouter du texte'}
+            </h3>
+            
+            {/* Text Size Control */}
+            <div className="mb-4">
+              <label className="text-white text-sm mb-2 block">
+                Taille: {textSize}px
+              </label>
+              <input
+                type="range"
+                min="12"
+                max="200"
+                value={textSize}
+                onChange={(e) => setTextSize(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+
+            {/* Text Color Control */}
+            <div className="mb-4">
+              <label className="text-white text-sm mb-2 block">Couleur</label>
+              <div className="flex gap-2">
+                <input
+                  type="color"
+                  value={textColor}
+                  onChange={(e) => setTextColor(e.target.value)}
+                  className="w-12 h-12 rounded cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={textColor}
+                  onChange={(e) => setTextColor(e.target.value)}
+                  className="flex-1 bg-gray-700 text-white px-3 py-2 rounded text-sm"
+                  placeholder="#000000"
+                />
+              </div>
+            </div>
+
+            {/* Text Content */}
+            <textarea
+              value={textInputValue}
+              onChange={(e) => setTextInputValue(e.target.value)}
+              placeholder="Entrez votre texte ici..."
+              className="w-full bg-gray-700 text-white px-3 py-2 rounded mb-4 min-h-[100px] resize-vertical"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                  handleTextSubmit();
+                } else if (e.key === 'Escape') {
+                  handleTextCancel();
+                }
+              }}
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={handleTextCancel}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded transition-colors"
+              >
+                Annuler (Esc)
+              </button>
+              <button
+                onClick={handleTextSubmit}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition-colors"
+              >
+                Ajouter (Ctrl+Enter)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
