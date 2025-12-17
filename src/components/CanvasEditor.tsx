@@ -135,10 +135,24 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
     
-    // Adjust for zoom and pan
+    // Get mouse position in the container, adjusted for zoom and pan
+    const containerX = (e.clientX - rect.left - pan.x) / zoom;
+    const containerY = (e.clientY - rect.top - pan.y) / zoom;
+    
+    // Adjust for active layer position and transform
+    if (activeLayer) {
+      const layerPos = activeLayer.position || { x: 0, y: 0 };
+      const layerTransform = activeLayer.transform || { scaleX: 1, scaleY: 1, rotation: 0 };
+      
+      return {
+        x: (containerX - layerPos.x) / layerTransform.scaleX,
+        y: (containerY - layerPos.y) / layerTransform.scaleY,
+      };
+    }
+    
     return {
-      x: (e.clientX - rect.left - pan.x) / zoom,
-      y: (e.clientY - rect.top - pan.y) / zoom,
+      x: containerX,
+      y: containerY,
     };
   };
 
