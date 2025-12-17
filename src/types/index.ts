@@ -17,6 +17,7 @@ export interface Layer {
     color: string;
     bold: boolean;
     italic: boolean;
+    align?: 'left' | 'center' | 'right';
   };
   position?: {
     x: number;
@@ -44,6 +45,7 @@ export interface TextSettings {
   fontFamily: string;
   bold: boolean;
   italic: boolean;
+  align: 'left' | 'center' | 'right';
 }
 
 export type FilterType = 'grayscale' | 'sepia' | 'blur' | 'brightness' | 'contrast' | 'invert' | 'saturate';

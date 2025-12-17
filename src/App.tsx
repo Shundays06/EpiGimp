@@ -23,6 +23,7 @@ function App() {
     fontFamily: 'Arial',
     bold: false,
     italic: false,
+    align: 'left',
   });
   
   const { saveState, undo, redo, canUndo, canRedo, clear: clearHistory } = useHistory();
@@ -167,7 +168,17 @@ function App() {
     setActiveLayerId(newLayer.id);
   };
 
-  const handleAddTextLayer = (textContent: string, x: number, y: number, fontSize: number, color: string) => {
+  const handleAddTextLayer = (
+    textContent: string, 
+    x: number, 
+    y: number, 
+    fontSize: number, 
+    color: string,
+    fontFamily: string,
+    bold: boolean,
+    italic: boolean,
+    align: 'left' | 'center' | 'right'
+  ) => {
     if (layers.length === 0) return;
 
     const baseLayer = layers[0];
@@ -182,14 +193,17 @@ function App() {
 
     // Draw the text on the new layer
     let fontStyle = '';
-    if (textSettings.italic) fontStyle += 'italic ';
-    if (textSettings.bold) fontStyle += 'bold ';
+    if (italic) fontStyle += 'italic ';
+    if (bold) fontStyle += 'bold ';
     
-    ctx.font = `${fontStyle}${fontSize}px ${textSettings.fontFamily}`;
+    ctx.font = `${fontStyle}${fontSize}px ${fontFamily}`;
     ctx.fillStyle = color;
     ctx.textBaseline = 'top';
     
-    console.log('Font settings:', ctx.font, 'Color:', ctx.fillStyle);
+    // Set text alignment
+    ctx.textAlign = align;
+    
+    console.log('Font settings:', ctx.font, 'Color:', ctx.fillStyle, 'Align:', align);
     
     // Draw text with multiple lines support
     const lines = textContent.split('\n');
@@ -216,10 +230,11 @@ function App() {
         x,
         y,
         fontSize: fontSize,
-        fontFamily: textSettings.fontFamily,
+        fontFamily: fontFamily,
         color: color,
-        bold: textSettings.bold,
-        italic: textSettings.italic,
+        bold: bold,
+        italic: italic,
+        align: align,
       },
       position: { x: 0, y: 0 },
     };
@@ -252,6 +267,7 @@ function App() {
     ctx.font = `${fontStyle}${updatedTextData.fontSize}px ${updatedTextData.fontFamily}`;
     ctx.fillStyle = updatedTextData.color;
     ctx.textBaseline = 'top';
+    ctx.textAlign = updatedTextData.align || 'left';
     
     const lines = updatedTextData.content.split('\n');
     lines.forEach((line, index) => {

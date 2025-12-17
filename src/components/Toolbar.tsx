@@ -275,6 +275,45 @@ const Toolbar: React.FC<ToolbarProps> = ({
             </button>
           </div>
 
+          <div>
+            <label className="text-sm mb-2 block">Alignement</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => onTextSettingsChange({ ...textSettings, align: 'left' })}
+                className={`flex-1 px-3 py-2 rounded transition-colors ${
+                  textSettings.align === 'left'
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-gray-700 hover:bg-gray-600'
+                }`}
+                title="Aligner à gauche"
+              >
+                ⬅
+              </button>
+              <button
+                onClick={() => onTextSettingsChange({ ...textSettings, align: 'center' })}
+                className={`flex-1 px-3 py-2 rounded transition-colors ${
+                  textSettings.align === 'center'
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-gray-700 hover:bg-gray-600'
+                }`}
+                title="Centrer"
+              >
+                ↔
+              </button>
+              <button
+                onClick={() => onTextSettingsChange({ ...textSettings, align: 'right' })}
+                className={`flex-1 px-3 py-2 rounded transition-colors ${
+                  textSettings.align === 'right'
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-gray-700 hover:bg-gray-600'
+                }`}
+                title="Aligner à droite"
+              >
+                ➡
+              </button>
+            </div>
+          </div>
+
           <p className="text-xs text-gray-400">
             💡 Cliquez sur le canvas pour ajouter un nouveau calque de texte
           </p>

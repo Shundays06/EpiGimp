@@ -12,7 +12,7 @@ interface CanvasEditorProps {
   brushStyle: BrushStyle;
   onLayerUpdate: (layerId: string) => void;
   onBeforeLayerModify: (layerId: string) => void;
-  onAddTextLayer: (textContent: string, x: number, y: number, fontSize: number, color: string) => void;
+  onAddTextLayer: (textContent: string, x: number, y: number, fontSize: number, color: string, fontFamily: string, bold: boolean, italic: boolean, align: 'left' | 'center' | 'right') => void;
   onUpdateTextLayer: (layerId: string, newTextData: Partial<Layer['textData']>) => void;
   onMoveLayer: (layerId: string, deltaX: number, deltaY: number) => void;
   textSettings?: TextSettings;
@@ -48,6 +48,10 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [textColor, setTextColor] = useState('#000000');
   const [textSize, setTextSize] = useState(32);
+  const [textFont, setTextFont] = useState('Arial');
+  const [textBold, setTextBold] = useState(false);
+  const [textItalic, setTextItalic] = useState(false);
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
 
   const activeLayer = layers.find((l) => l.id === activeLayerId);
 
@@ -179,6 +183,10 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       setTextInputValue(activeLayer.textData.content);
       setTextSize(activeLayer.textData.fontSize);
       setTextColor(activeLayer.textData.color);
+      setTextFont(activeLayer.textData.fontFamily);
+      setTextBold(activeLayer.textData.bold);
+      setTextItalic(activeLayer.textData.italic);
+      setTextAlign(activeLayer.textData.align || 'left');
       setShowTextInput(true);
       return;
     }
@@ -195,6 +203,10 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       setTextInputValue('');
       setTextSize(textSettings?.fontSize || 32);
       setTextColor(brushColor);
+      setTextFont(textSettings?.fontFamily || 'Arial');
+      setTextBold(textSettings?.bold || false);
+      setTextItalic(textSettings?.italic || false);
+      setTextAlign(textSettings?.align || 'left');
       setShowTextInput(true);
       return;
     }
@@ -484,10 +496,24 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
           y: pendingTextPosition.y,
           fontSize: textSize,
           color: textColor,
+          fontFamily: textFont,
+          bold: textBold,
+          italic: textItalic,
+          align: textAlign,
         });
       } else {
-        // Create a new text layer with custom size and color from the modal
-        onAddTextLayer(textInputValue, pendingTextPosition.x, pendingTextPosition.y, textSize, textColor);
+        // Create a new text layer with all settings
+        onAddTextLayer(
+          textInputValue, 
+          pendingTextPosition.x, 
+          pendingTextPosition.y, 
+          textSize, 
+          textColor,
+          textFont,
+          textBold,
+          textItalic,
+          textAlign
+        );
       }
     }
     setShowTextInput(false);
@@ -571,6 +597,20 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
               {editingLayerId ? 'Modifier le texte' : 'Ajouter du texte'}
             </h3>
             
+            {/* Font Family Control */}
+            <div className="mb-4">
+              <label className="text-white text-sm mb-2 block">Police</label>
+              <select
+                value={textFont}
+                onChange={(e) => setTextFont(e.target.value)}
+                className="w-full bg-gray-700 text-white px-3 py-2 rounded"
+              >
+                {['Arial', 'Verdana', 'Times New Roman', 'Courier New', 'Georgia', 'Comic Sans MS', 'Impact', 'Trebuchet MS'].map(font => (
+                  <option key={font} value={font}>{font}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Text Size Control */}
             <div className="mb-4">
               <label className="text-white text-sm mb-2 block">
@@ -603,6 +643,63 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                   className="flex-1 bg-gray-700 text-white px-3 py-2 rounded text-sm"
                   placeholder="#000000"
                 />
+              </div>
+            </div>
+
+            {/* Bold and Italic Controls */}
+            <div className="mb-4">
+              <label className="text-white text-sm mb-2 block">Style</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setTextBold(!textBold)}
+                  className={`flex-1 px-4 py-2 rounded font-bold transition-colors ${
+                    textBold ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'
+                  }`}
+                >
+                  B
+                </button>
+                <button
+                  onClick={() => setTextItalic(!textItalic)}
+                  className={`flex-1 px-4 py-2 rounded italic transition-colors ${
+                    textItalic ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'
+                  }`}
+                >
+                  I
+                </button>
+              </div>
+            </div>
+
+            {/* Text Alignment Control */}
+            <div className="mb-4">
+              <label className="text-white text-sm mb-2 block">Alignement</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setTextAlign('left')}
+                  className={`flex-1 px-4 py-2 rounded transition-colors ${
+                    textAlign === 'left' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'
+                  }`}
+                  title="Aligner à gauche"
+                >
+                  ⬅
+                </button>
+                <button
+                  onClick={() => setTextAlign('center')}
+                  className={`flex-1 px-4 py-2 rounded transition-colors ${
+                    textAlign === 'center' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'
+                  }`}
+                  title="Centrer"
+                >
+                  ↔
+                </button>
+                <button
+                  onClick={() => setTextAlign('right')}
+                  className={`flex-1 px-4 py-2 rounded transition-colors ${
+                    textAlign === 'right' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'
+                  }`}
+                  title="Aligner à droite"
+                >
+                  ➡
+                </button>
               </div>
             </div>
 
