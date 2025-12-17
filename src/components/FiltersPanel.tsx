@@ -18,6 +18,8 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'png' | 'jpeg' | 'webp' | 'bmp' | 'gif'>('png');
   const [exportQuality, setExportQuality] = useState(92);
+  const [fileName, setFileName] = useState('epigimp-export');
+  const [fileNameError, setFileNameError] = useState('');
 
   const filters: { id: FilterType; label: string; hasValue: boolean; min?: number; max?: number; defaultValue?: number }[] = [
     { id: 'grayscale', label: 'Niveaux de gris', hasValue: false },
@@ -58,10 +60,53 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({
 
   const openExportModal = (format: 'png' | 'jpeg' | 'webp' | 'bmp' | 'gif') => {
     setExportFormat(format);
+    setFileName('epigimp-export');
+    setFileNameError('');
     setShowExportModal(true);
   };
 
+  const validateFileName = (name: string): boolean => {
+    // Vérifier si le nom est vide
+    if (!name.trim()) {
+      setFileNameError('Le nom du fichier ne peut pas être vide');
+      return false;
+    }
+
+    // Caractères interdits sur Windows, macOS et Linux
+    const invalidChars = /[<>:"/\\|?*\x00-\x1F]/g;
+    if (invalidChars.test(name)) {
+      setFileNameError('Le nom contient des caractères invalides (< > : " / \\ | ? *)');
+      return false;
+    }
+
+    // Noms réservés sur Windows
+    const reservedNames = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i;
+    if (reservedNames.test(name)) {
+      setFileNameError('Ce nom est réservé par le système');
+      return false;
+    }
+
+    // Vérifier que le nom ne commence/finit pas par un espace ou un point
+    if (name.startsWith(' ') || name.startsWith('.') || name.endsWith(' ') || name.endsWith('.')) {
+      setFileNameError('Le nom ne peut pas commencer ou finir par un espace ou un point');
+      return false;
+    }
+
+    setFileNameError('');
+    return true;
+  };
+
+  const handleFileNameChange = (name: string) => {
+    setFileName(name);
+    validateFileName(name);
+  };
+
   const handleExportConfirm = () => {
+    // Valider le nom de fichier avant l'export
+    if (!validateFileName(fileName)) {
+      return;
+    }
+
     const canvases = layers
       .filter((l) => l.visible)
       .map((l) => l.canvas);
@@ -72,7 +117,7 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({
     // Download
     const link = document.createElement('a');
     const extension = exportFormat === 'jpeg' ? 'jpg' : exportFormat;
-    link.download = `epigimp-export-${Date.now()}.${extension}`;
+    link.download = `${fileName}.${extension}`;
     link.href = dataUrl;
     link.click();
     
@@ -176,6 +221,34 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({
           <div className="bg-gray-800 rounded-lg p-6 w-96 shadow-xl">
             <h3 className="text-xl font-bold mb-4">Exporter en {exportFormat.toUpperCase()}</h3>
             
+            {/* File Name Input */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">
+                Nom du fichier
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={fileName}
+                  onChange={(e) => handleFileNameChange(e.target.value)}
+                  className={`flex-1 bg-gray-700 px-3 py-2 rounded text-sm ${
+                    fileNameError ? 'border-2 border-red-500' : ''
+                  }`}
+                  placeholder="nom-du-fichier"
+                  autoFocus
+                />
+                <span className="text-gray-400 text-sm">
+                  .{exportFormat === 'jpeg' ? 'jpg' : exportFormat}
+                </span>
+              </div>
+              {fileNameError && (
+                <p className="text-red-400 text-xs mt-1">{fileNameError}</p>
+              )}
+              <p className="text-gray-400 text-xs mt-1">
+                Caractères interdits: {'< > : " / \\ | ? *'}
+              </p>
+            </div>
+            
             {/* Format Info */}
             <div className="mb-4 p-3 bg-gray-700 rounded text-sm">
               {exportFormat === 'png' && (
@@ -226,7 +299,12 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({
               </button>
               <button
                 onClick={handleExportConfirm}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded transition-colors"
+                disabled={!!fileNameError || !fileName.trim()}
+                className={`flex-1 px-4 py-2 rounded transition-colors ${
+                  fileNameError || !fileName.trim()
+                    ? 'bg-gray-600 cursor-not-allowed opacity-50'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
                 Exporter
               </button>
