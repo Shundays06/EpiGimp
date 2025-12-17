@@ -98,6 +98,72 @@ function App() {
     setActiveLayerId(newLayer.id);
   };
 
+  const handleImageAsLayer = (img: HTMLImageElement) => {
+    if (layers.length === 0) {
+      // Si aucun calque n'existe, créer le premier calque
+      handleImageLoad(img);
+      return;
+    }
+
+    const baseLayer = layers[0];
+    const canvas = document.createElement('canvas');
+    
+    // Utiliser les dimensions du canvas principal
+    canvas.width = baseLayer.canvas.width;
+    canvas.height = baseLayer.canvas.height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Calculer les dimensions pour adapter l'image au canvas si nécessaire
+    let drawWidth = img.width;
+    let drawHeight = img.height;
+    let drawX = 0;
+    let drawY = 0;
+
+    // Si l'image est plus grande que le canvas, la redimensionner
+    if (img.width > canvas.width || img.height > canvas.height) {
+      const scaleX = canvas.width / img.width;
+      const scaleY = canvas.height / img.height;
+      const scale = Math.min(scaleX, scaleY);
+      
+      drawWidth = img.width * scale;
+      drawHeight = img.height * scale;
+      
+      // Centrer l'image
+      drawX = (canvas.width - drawWidth) / 2;
+      drawY = (canvas.height - drawHeight) / 2;
+    } else {
+      // Centrer l'image si elle est plus petite
+      drawX = (canvas.width - img.width) / 2;
+      drawY = (canvas.height - img.height) / 2;
+    }
+
+    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+
+    const newLayer: Layer = {
+      id: Date.now().toString(),
+      name: `Image ${layers.length + 1}`,
+      visible: true,
+      opacity: 1,
+      canvas,
+      thumbnail: canvas.toDataURL('image/png', 0.1),
+      type: 'image',
+      position: {
+        x: drawX,
+        y: drawY,
+      },
+      transform: {
+        scaleX: drawWidth / img.width,
+        scaleY: drawHeight / img.height,
+        rotation: 0,
+      },
+    };
+
+    setLayers([...layers, newLayer]);
+    setActiveLayerId(newLayer.id);
+  };
+
   const handleAddTextLayer = (textContent: string, x: number, y: number, fontSize: number, color: string) => {
     if (layers.length === 0) return;
 
@@ -404,6 +470,7 @@ function App() {
                 onLayerDelete={handleLayerDelete}
                 onLayerVisibilityToggle={handleLayerVisibilityToggle}
                 onLayerOpacityChange={handleLayerOpacityChange}
+                onImageAsLayer={handleImageAsLayer}
               />
               <div className="border-t-4 border-gray-900" />
               <FiltersPanel
