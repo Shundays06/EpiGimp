@@ -4,7 +4,7 @@ import Toolbar from './components/Toolbar';
 import LayersPanel from './components/LayersPanel';
 import CanvasEditor from './components/CanvasEditor';
 import FiltersPanel from './components/FiltersPanel';
-import type { Layer, Tool, TextSettings } from './types';
+import type { Layer, Tool, TextSettings, BrushStyle } from './types';
 import { useHistory } from './hooks/useHistory';
 import './App.css';
 
@@ -14,6 +14,9 @@ function App() {
   const [currentTool, setCurrentTool] = useState<Tool>('brush');
   const [brushSize, setBrushSize] = useState(5);
   const [brushColor, setBrushColor] = useState('#000000');
+  const [brushOpacity, setBrushOpacity] = useState(1);
+  const [brushHardness, setBrushHardness] = useState(100);
+  const [brushStyle, setBrushStyle] = useState<BrushStyle>('round');
   const [showUploader, setShowUploader] = useState(true);
   const [textSettings, setTextSettings] = useState<TextSettings>({
     fontSize: 32,
@@ -438,6 +441,12 @@ function App() {
                 onBrushSizeChange={setBrushSize}
                 brushColor={brushColor}
                 onBrushColorChange={setBrushColor}
+                brushOpacity={brushOpacity}
+                onBrushOpacityChange={setBrushOpacity}
+                brushHardness={brushHardness}
+                onBrushHardnessChange={setBrushHardness}
+                brushStyle={brushStyle}
+                onBrushStyleChange={setBrushStyle}
                 textSettings={textSettings}
                 onTextSettingsChange={setTextSettings}
               />
@@ -451,6 +460,9 @@ function App() {
                 currentTool={currentTool}
                 brushSize={brushSize}
                 brushColor={brushColor}
+                brushOpacity={brushOpacity}
+                brushHardness={brushHardness}
+                brushStyle={brushStyle}
                 onLayerUpdate={handleLayerUpdate}
                 onBeforeLayerModify={handleBeforeLayerModify}
                 onAddTextLayer={handleAddTextLayer}

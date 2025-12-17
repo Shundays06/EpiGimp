@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import type { Layer, Tool, Point, TextSettings } from '../types';
+import type { Layer, Tool, Point, TextSettings, BrushStyle } from '../types';
 
 interface CanvasEditorProps {
   layers: Layer[];
@@ -7,6 +7,9 @@ interface CanvasEditorProps {
   currentTool: Tool;
   brushSize: number;
   brushColor: string;
+  brushOpacity: number;
+  brushHardness: number;
+  brushStyle: BrushStyle;
   onLayerUpdate: (layerId: string) => void;
   onBeforeLayerModify: (layerId: string) => void;
   onAddTextLayer: (textContent: string, x: number, y: number, fontSize: number, color: string) => void;
@@ -21,6 +24,9 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   currentTool,
   brushSize,
   brushColor,
+  brushOpacity,
+  brushHardness,
+  brushStyle,
   onLayerUpdate,
   onBeforeLayerModify,
   onAddTextLayer,
@@ -262,13 +268,123 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     if (!ctx) return;
 
     ctx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
+    ctx.globalAlpha = brushOpacity;
+
+    switch (brushStyle) {
+      case 'round':
+        drawRoundBrush(ctx, point);
+        break;
+      case 'square':
+        drawSquareBrush(ctx, point);
+        break;
+      case 'soft':
+        drawSoftBrush(ctx, point);
+        break;
+      case 'spray':
+        drawSprayBrush(ctx, point);
+        break;
+      case 'calligraphy':
+        drawCalligraphyBrush(ctx, point);
+        break;
+      case 'pixel':
+        drawPixelBrush(ctx, point);
+        break;
+      default:
+        drawRoundBrush(ctx, point);
+    }
+
+    ctx.globalAlpha = 1; // Reset
+    
+    // Force update display
+    setForceUpdate(prev => prev + 1);
+  };
+
+  const drawRoundBrush = (ctx: CanvasRenderingContext2D, point: Point) => {
     ctx.fillStyle = brushColor;
     ctx.beginPath();
     ctx.arc(point.x, point.y, brushSize / 2, 0, Math.PI * 2);
     ctx.fill();
+  };
+
+  const drawSquareBrush = (ctx: CanvasRenderingContext2D, point: Point) => {
+    ctx.fillStyle = brushColor;
+    ctx.fillRect(
+      point.x - brushSize / 2,
+      point.y - brushSize / 2,
+      brushSize,
+      brushSize
+    );
+  };
+
+  const drawSoftBrush = (ctx: CanvasRenderingContext2D, point: Point) => {
+    const gradient = ctx.createRadialGradient(
+      point.x, point.y, 0,
+      point.x, point.y, brushSize / 2
+    );
     
-    // Force update display
-    setForceUpdate(prev => prev + 1);
+    const hardnessRatio = brushHardness / 100;
+    const colorWithAlpha = brushColor + Math.floor(255 * hardnessRatio).toString(16).padStart(2, '0');
+    
+    gradient.addColorStop(0, colorWithAlpha);
+    gradient.addColorStop(hardnessRatio, brushColor + '80');
+    gradient.addColorStop(1, brushColor + '00');
+    
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, brushSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  const drawSprayBrush = (ctx: CanvasRenderingContext2D, point: Point) => {
+    const density = 50; // Number of spray particles
+    const radius = brushSize / 2;
+    
+    ctx.fillStyle = brushColor;
+    
+    for (let i = 0; i < density; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = Math.random() * radius;
+      const x = point.x + Math.cos(angle) * distance;
+      const y = point.y + Math.sin(angle) * distance;
+      
+      ctx.beginPath();
+      ctx.arc(x, y, 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+
+  const drawCalligraphyBrush = (ctx: CanvasRenderingContext2D, point: Point) => {
+    ctx.fillStyle = brushColor;
+    
+    // Forme elliptique inclinée à 45 degrés
+    ctx.save();
+    ctx.translate(point.x, point.y);
+    ctx.rotate(Math.PI / 4);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, brushSize / 2, brushSize / 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+
+  const drawPixelBrush = (ctx: CanvasRenderingContext2D, point: Point) => {
+    const pixelSize = Math.max(2, Math.floor(brushSize / 4));
+    const gridX = Math.floor(point.x / pixelSize) * pixelSize;
+    const gridY = Math.floor(point.y / pixelSize) * pixelSize;
+    
+    ctx.fillStyle = brushColor;
+    
+    const gridSize = Math.ceil(brushSize / pixelSize);
+    for (let i = -gridSize; i <= gridSize; i++) {
+      for (let j = -gridSize; j <= gridSize; j++) {
+        const px = gridX + i * pixelSize;
+        const py = gridY + j * pixelSize;
+        const distance = Math.sqrt((px - point.x) ** 2 + (py - point.y) ** 2);
+        
+        if (distance <= brushSize / 2) {
+          ctx.fillRect(px, py, pixelSize, pixelSize);
+        }
+      }
+    }
   };
 
   const drawLine = (from: Point, to: Point) => {
@@ -277,16 +393,45 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     const ctx = activeLayer.canvas.getContext('2d');
     if (!ctx) return;
 
+    // Pour les pinceaux avec des patterns spéciaux, dessiner point par point
+    if (['spray', 'pixel'].includes(brushStyle)) {
+      const distance = Math.sqrt((to.x - from.x) ** 2 + (to.y - from.y) ** 2);
+      const steps = Math.max(1, Math.floor(distance / 2));
+      
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const point = {
+          x: from.x + (to.x - from.x) * t,
+          y: from.y + (to.y - from.y) * t,
+        };
+        drawPoint(point);
+      }
+      return;
+    }
+
+    // Pour les autres styles, utiliser le dessin de ligne
     ctx.globalCompositeOperation = currentTool === 'eraser' ? 'destination-out' : 'source-over';
+    ctx.globalAlpha = brushOpacity;
     ctx.strokeStyle = brushColor;
     ctx.lineWidth = brushSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
+    // Ajuster le style de ligne selon le brush style
+    if (brushStyle === 'square') {
+      ctx.lineCap = 'square';
+    } else if (brushStyle === 'calligraphy') {
+      // Pour la calligraphie, dessiner plusieurs fois avec différentes épaisseurs
+      const angle = Math.atan2(to.y - from.y, to.x - from.x) + Math.PI / 4;
+      ctx.lineWidth = brushSize * (0.5 + 0.5 * Math.abs(Math.cos(angle)));
+    }
+
     ctx.beginPath();
     ctx.moveTo(from.x, from.y);
     ctx.lineTo(to.x, to.y);
     ctx.stroke();
+
+    ctx.globalAlpha = 1; // Reset
     
     // Force update display
     setForceUpdate(prev => prev + 1);

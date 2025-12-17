@@ -33,7 +33,11 @@ export interface BrushSettings {
   size: number;
   color: string;
   opacity: number;
+  hardness: number;
+  style: BrushStyle;
 }
+
+export type BrushStyle = 'round' | 'square' | 'soft' | 'spray' | 'calligraphy' | 'pixel';
 
 export interface TextSettings {
   fontSize: number;

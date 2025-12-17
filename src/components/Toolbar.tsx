@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Tool, TextSettings } from '../types';
+import type { Tool, TextSettings, BrushStyle } from '../types';
 
 interface ToolbarProps {
   selectedTool: Tool;
@@ -8,6 +8,12 @@ interface ToolbarProps {
   onBrushSizeChange: (size: number) => void;
   brushColor: string;
   onBrushColorChange: (color: string) => void;
+  brushOpacity: number;
+  onBrushOpacityChange: (opacity: number) => void;
+  brushHardness: number;
+  onBrushHardnessChange: (hardness: number) => void;
+  brushStyle: BrushStyle;
+  onBrushStyleChange: (style: BrushStyle) => void;
   textSettings?: TextSettings;
   onTextSettingsChange?: (settings: TextSettings) => void;
 }
@@ -19,6 +25,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onBrushSizeChange,
   brushColor,
   onBrushColorChange,
+  brushOpacity,
+  onBrushOpacityChange,
+  brushHardness,
+  onBrushHardnessChange,
+  brushStyle,
+  onBrushStyleChange,
   textSettings,
   onTextSettingsChange,
 }) => {
@@ -67,6 +79,35 @@ const Toolbar: React.FC<ToolbarProps> = ({
       {/* Brush Settings */}
       {(selectedTool === 'brush' || selectedTool === 'eraser') && (
         <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-gray-700">
+          {selectedTool === 'brush' && (
+            <div>
+              <label className="text-sm mb-2 block">Style de pinceau</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'round', label: '●', tooltip: 'Rond' },
+                  { id: 'square', label: '■', tooltip: 'Carré' },
+                  { id: 'soft', label: '◐', tooltip: 'Doux' },
+                  { id: 'spray', label: '✦', tooltip: 'Spray' },
+                  { id: 'calligraphy', label: '/', tooltip: 'Calligraphie' },
+                  { id: 'pixel', label: '▪', tooltip: 'Pixel' },
+                ].map((style) => (
+                  <button
+                    key={style.id}
+                    onClick={() => onBrushStyleChange(style.id as BrushStyle)}
+                    className={`px-3 py-2 rounded text-xl transition-colors ${
+                      brushStyle === style.id
+                        ? 'bg-blue-600 hover:bg-blue-700'
+                        : 'bg-gray-700 hover:bg-gray-600'
+                    }`}
+                    title={style.tooltip}
+                  >
+                    {style.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <div>
             <label className="text-sm mb-2 block">Taille: {brushSize}px</label>
             <input
@@ -80,24 +121,50 @@ const Toolbar: React.FC<ToolbarProps> = ({
           </div>
 
           {selectedTool === 'brush' && (
-            <div>
-              <label className="text-sm mb-2 block">Couleur</label>
-              <div className="flex gap-2 items-center">
+            <>
+              <div>
+                <label className="text-sm mb-2 block">Couleur</label>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={brushColor}
+                    onChange={(e) => onBrushColorChange(e.target.value)}
+                    className="w-12 h-12 rounded cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={brushColor}
+                    onChange={(e) => onBrushColorChange(e.target.value)}
+                    className="flex-1 bg-gray-700 px-2 py-1 rounded text-sm"
+                    placeholder="#000000"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-sm mb-2 block">Opacité: {Math.round(brushOpacity * 100)}%</label>
                 <input
-                  type="color"
-                  value={brushColor}
-                  onChange={(e) => onBrushColorChange(e.target.value)}
-                  className="w-12 h-12 rounded cursor-pointer"
-                />
-                <input
-                  type="text"
-                  value={brushColor}
-                  onChange={(e) => onBrushColorChange(e.target.value)}
-                  className="flex-1 bg-gray-700 px-2 py-1 rounded text-sm"
-                  placeholder="#000000"
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={brushOpacity * 100}
+                  onChange={(e) => onBrushOpacityChange(Number(e.target.value) / 100)}
+                  className="w-full"
                 />
               </div>
-            </div>
+              
+              <div>
+                <label className="text-sm mb-2 block">Dureté: {brushHardness}%</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={brushHardness}
+                  onChange={(e) => onBrushHardnessChange(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </>
           )}
         </div>
       )}
