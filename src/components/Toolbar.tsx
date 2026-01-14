@@ -34,12 +34,16 @@ const Toolbar: React.FC<ToolbarProps> = ({
   textSettings,
   onTextSettingsChange,
 }) => {
-  const tools: { id: Tool; label: string; icon: string }[] = [
-    { id: 'brush', label: 'Pinceau', icon: '🖌️' },
-    { id: 'eraser', label: 'Gomme', icon: '🧹' },
-    { id: 'eyedropper', label: 'Pipette', icon: '💧' },
-    { id: 'move', label: 'Déplacer', icon: '✋' },
-    { id: 'text', label: 'Texte', icon: '🔤' },
+  const tools: { id: Tool; label: string; icon: string; group?: string }[] = [
+    { id: 'brush', label: 'Pinceau', icon: '🖌️', group: 'draw' },
+    { id: 'eraser', label: 'Gomme', icon: '🧹', group: 'draw' },
+    { id: 'eyedropper', label: 'Pipette', icon: '💧', group: 'draw' },
+    { id: 'move', label: 'Déplacer', icon: '✋', group: 'transform' },
+    { id: 'transform', label: 'Transformer', icon: '🔄', group: 'transform' },
+    { id: 'text', label: 'Texte', icon: '🔤', group: 'draw' },
+    { id: 'select-rect', label: 'Sélection rectangle', icon: '⬜', group: 'select' },
+    { id: 'select-ellipse', label: 'Sélection ellipse', icon: '⭕', group: 'select' },
+    { id: 'select-lasso', label: 'Lasso', icon: '✂️', group: 'select' },
   ];
 
   const fontFamilies = [
@@ -57,9 +61,50 @@ const Toolbar: React.FC<ToolbarProps> = ({
     <div className="bg-gray-800 text-white p-4 flex flex-col gap-4">
       <h2 className="text-lg font-bold">Outils</h2>
       
-      {/* Tools */}
-      <div className="flex flex-col gap-2">
-        {tools.map((tool) => (
+      {/* Drawing Tools */}
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-gray-400 uppercase">Dessin</span>
+        {tools.filter(t => t.group === 'draw').map((tool) => (
+          <button
+            key={tool.id}
+            onClick={() => onToolChange(tool.id)}
+            className={`flex items-center gap-3 px-4 py-2 rounded transition-colors ${
+              selectedTool === tool.id
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-gray-700 hover:bg-gray-600'
+            }`}
+            title={tool.label}
+          >
+            <span className="text-2xl">{tool.icon}</span>
+            <span className="text-sm">{tool.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Transform Tools */}
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-gray-400 uppercase">Transformation</span>
+        {tools.filter(t => t.group === 'transform').map((tool) => (
+          <button
+            key={tool.id}
+            onClick={() => onToolChange(tool.id)}
+            className={`flex items-center gap-3 px-4 py-2 rounded transition-colors ${
+              selectedTool === tool.id
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-gray-700 hover:bg-gray-600'
+            }`}
+            title={tool.label}
+          >
+            <span className="text-2xl">{tool.icon}</span>
+            <span className="text-sm">{tool.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Selection Tools */}
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-gray-400 uppercase">Sélection</span>
+        {tools.filter(t => t.group === 'select').map((tool) => (
           <button
             key={tool.id}
             onClick={() => onToolChange(tool.id)}
@@ -199,6 +244,59 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <p className="text-xs text-gray-400 mt-2">
               🔤 Double-cliquez sur un calque de texte pour l'éditer
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Transform Tool Info */}
+      {selectedTool === 'transform' && (
+        <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-gray-700">
+          <div className="bg-gray-700 p-3 rounded">
+            <p className="text-xs text-gray-400 mb-2">🔄 Outil de transformation</p>
+            <p className="text-xs text-gray-400">
+              💡 Cliquez sur le calque pour ouvrir le panneau de transformation
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              • Rotation: Faire pivoter le calque
+            </p>
+            <p className="text-xs text-gray-400">
+              • Échelle: Agrandir/réduire
+            </p>
+            <p className="text-xs text-gray-400">
+              • Déformation: Incliner le calque
+            </p>
+            <p className="text-xs text-gray-400">
+              • Redimensionner: Changer la taille en pixels
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Selection Tool Info */}
+      {(selectedTool === 'select-rect' || selectedTool === 'select-ellipse' || selectedTool === 'select-lasso') && (
+        <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-gray-700">
+          <div className="bg-gray-700 p-3 rounded">
+            <p className="text-xs text-gray-400 mb-2">
+              {selectedTool === 'select-rect' && '⬜ Sélection rectangulaire'}
+              {selectedTool === 'select-ellipse' && '⭕ Sélection elliptique'}
+              {selectedTool === 'select-lasso' && '✂️ Sélection lasso'}
+            </p>
+            <p className="text-xs text-gray-400">
+              💡 {selectedTool === 'select-lasso' 
+                ? 'Dessinez une forme libre pour sélectionner'
+                : 'Cliquez et glissez pour créer une sélection'}
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              📋 Raccourcis:
+            </p>
+            <ul className="text-xs text-gray-400 mt-1 ml-2">
+              <li>Ctrl+A : Tout sélectionner</li>
+              <li>Ctrl+D : Désélectionner</li>
+              <li>Ctrl+C : Copier</li>
+              <li>Ctrl+X : Couper</li>
+              <li>Ctrl+V : Coller</li>
+              <li>Suppr : Effacer</li>
+            </ul>
           </div>
         </div>
       )}
