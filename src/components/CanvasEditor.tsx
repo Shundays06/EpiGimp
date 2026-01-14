@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import type { Layer, Tool, Point, TextSettings, BrushStyle } from '../types';
+import type { Layer, Tool, Point, TextSettings, BrushStyle, Selection } from '../types';
 
 interface CanvasEditorProps {
   layers: Layer[];
@@ -16,6 +16,11 @@ interface CanvasEditorProps {
   onUpdateTextLayer: (layerId: string, newTextData: Partial<Layer['textData']>) => void;
   onMoveLayer: (layerId: string, deltaX: number, deltaY: number) => void;
   textSettings?: TextSettings;
+  // Selection props
+  selection?: Selection | null;
+  onSelectionChange?: (selection: Selection | null) => void;
+  // Transform props
+  onOpenTransformPanel?: () => void;
 }
 
 const CanvasEditor: React.FC<CanvasEditorProps> = ({
@@ -33,6 +38,9 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   onUpdateTextLayer,
   onMoveLayer,
   textSettings,
+  selection,
+  onSelectionChange,
+  onOpenTransformPanel,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -48,6 +56,12 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [textColor, setTextColor] = useState('#000000');
   const [textSize, setTextSize] = useState(32);
+  
+  // Selection state
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStart, setSelectionStart] = useState<Point | null>(null);
+  const [selectionCurrent, setSelectionCurrent] = useState<Point | null>(null);
+  const [lassoPoints, setLassoPoints] = useState<Point[]>([]);
   const [textFont, setTextFont] = useState('Arial');
   const [textBold, setTextBold] = useState(false);
   const [textItalic, setTextItalic] = useState(false);
@@ -115,13 +129,15 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
         
         const layerPos = layer.position || { x: 0, y: 0 };
         const layerTransform = layer.transform || { scaleX: 1, scaleY: 1, rotation: 0 };
-        const cursorStyle = isPanning ? 'grabbing' : currentTool === 'brush' ? 'crosshair' : currentTool === 'eraser' ? 'cell' : currentTool === 'eyedropper' ? 'pointer' : currentTool === 'text' ? 'text' : currentTool === 'move' ? 'move' : 'default';
+        const skewX = layerTransform.skewX || 0;
+        const skewY = layerTransform.skewY || 0;
+        const cursorStyle = isPanning ? 'grabbing' : currentTool === 'brush' ? 'crosshair' : currentTool === 'eraser' ? 'cell' : currentTool === 'eyedropper' ? 'pointer' : currentTool === 'text' ? 'text' : currentTool === 'move' ? 'move' : (currentTool === 'select-rect' || currentTool === 'select-ellipse' || currentTool === 'select-lasso') ? 'crosshair' : currentTool === 'transform' ? 'pointer' : 'default';
         
         displayCanvas.style.position = 'absolute';
         displayCanvas.style.top = '0';
         displayCanvas.style.left = '0';
-        displayCanvas.style.transform = `translate(${layerPos.x}px, ${layerPos.y}px) scale(${layerTransform.scaleX}, ${layerTransform.scaleY})`;
-        displayCanvas.style.transformOrigin = '0 0';
+        displayCanvas.style.transform = `translate(${layerPos.x}px, ${layerPos.y}px) scale(${layerTransform.scaleX}, ${layerTransform.scaleY}) skew(${skewX}deg, ${skewY}deg) rotate(${layerTransform.rotation}deg)`;
+        displayCanvas.style.transformOrigin = 'center center';
         displayCanvas.style.opacity = layer.opacity.toString();
         displayCanvas.style.pointerEvents = layer.id === activeLayerId ? 'auto' : 'none';
         displayCanvas.style.cursor = cursorStyle;
@@ -129,7 +145,79 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
         container.appendChild(displayCanvas);
       }
     });
-  }, [layers, activeLayerId, forceUpdate, currentTool, isPanning]);
+
+    // Draw selection overlay
+    if (activeLayer && (selection || (isSelecting && selectionStart && selectionCurrent))) {
+      const selectionCanvas = document.createElement('canvas');
+      selectionCanvas.width = activeLayer.canvas.width;
+      selectionCanvas.height = activeLayer.canvas.height;
+      selectionCanvas.style.position = 'absolute';
+      selectionCanvas.style.top = '0';
+      selectionCanvas.style.left = '0';
+      selectionCanvas.style.pointerEvents = 'none';
+      selectionCanvas.style.zIndex = '1000';
+
+      const ctx = selectionCanvas.getContext('2d');
+      if (ctx) {
+        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = '#00BFFF';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(0, 191, 255, 0.1)';
+
+        // Draw current selection being made
+        if (isSelecting && selectionStart && selectionCurrent) {
+          const x = Math.min(selectionStart.x, selectionCurrent.x);
+          const y = Math.min(selectionStart.y, selectionCurrent.y);
+          const width = Math.abs(selectionCurrent.x - selectionStart.x);
+          const height = Math.abs(selectionCurrent.y - selectionStart.y);
+
+          if (currentTool === 'select-rect') {
+            ctx.fillRect(x, y, width, height);
+            ctx.strokeRect(x, y, width, height);
+          } else if (currentTool === 'select-ellipse') {
+            ctx.beginPath();
+            ctx.ellipse(x + width / 2, y + height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          } else if (currentTool === 'select-lasso' && lassoPoints.length > 0) {
+            ctx.beginPath();
+            ctx.moveTo(lassoPoints[0].x, lassoPoints[0].y);
+            lassoPoints.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.stroke();
+          }
+        }
+
+        // Draw existing selection
+        if (selection && !isSelecting) {
+          ctx.strokeStyle = '#FF6B6B';
+          if (selection.type === 'rectangle' && selection.x !== undefined) {
+            ctx.fillRect(selection.x, selection.y!, selection.width!, selection.height!);
+            ctx.strokeRect(selection.x, selection.y!, selection.width!, selection.height!);
+          } else if (selection.type === 'ellipse' && selection.x !== undefined) {
+            ctx.beginPath();
+            ctx.ellipse(
+              selection.x + selection.width! / 2,
+              selection.y! + selection.height! / 2,
+              selection.width! / 2,
+              selection.height! / 2,
+              0, 0, Math.PI * 2
+            );
+            ctx.fill();
+            ctx.stroke();
+          } else if (selection.type === 'lasso' && selection.points) {
+            ctx.beginPath();
+            ctx.moveTo(selection.points[0].x, selection.points[0].y);
+            selection.points.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
+      }
+
+      container.appendChild(selectionCanvas);
+    }
+  }, [layers, activeLayerId, forceUpdate, currentTool, isPanning, selection, isSelecting, selectionStart, selectionCurrent, lassoPoints]);
 
   const getMousePos = (e: React.MouseEvent<HTMLDivElement>): Point => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -231,6 +319,25 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       setLastPoint(point);
       return;
     }
+
+    // Handle transform tool
+    if (currentTool === 'transform') {
+      if (onOpenTransformPanel) {
+        onOpenTransformPanel();
+      }
+      return;
+    }
+
+    // Handle selection tools
+    if (currentTool === 'select-rect' || currentTool === 'select-ellipse' || currentTool === 'select-lasso') {
+      setIsSelecting(true);
+      setSelectionStart(point);
+      setSelectionCurrent(point);
+      if (currentTool === 'select-lasso') {
+        setLassoPoints([point]);
+      }
+      return;
+    }
     
     // Save state BEFORE making any modifications
     onBeforeLayerModify(activeLayer.id);
@@ -252,10 +359,19 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
       });
       return;
     }
-    
-    if (!isDrawing || !activeLayer || !lastPoint) return;
 
     const point = getMousePos(e);
+
+    // Handle selection in progress
+    if (isSelecting && selectionStart) {
+      setSelectionCurrent(point);
+      if (currentTool === 'select-lasso') {
+        setLassoPoints(prev => [...prev, point]);
+      }
+      return;
+    }
+    
+    if (!isDrawing || !activeLayer || !lastPoint) return;
 
     if (currentTool === 'move') {
       // Move the active layer
@@ -278,6 +394,36 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const handleMouseUp = () => {
     if (isPanning) {
       setIsPanning(false);
+    }
+
+    // Finalize selection
+    if (isSelecting && selectionStart && selectionCurrent && onSelectionChange) {
+      if (currentTool === 'select-lasso' && lassoPoints.length > 2) {
+        onSelectionChange({
+          type: 'lasso',
+          points: lassoPoints,
+        });
+      } else if (currentTool === 'select-rect' || currentTool === 'select-ellipse') {
+        const x = Math.min(selectionStart.x, selectionCurrent.x);
+        const y = Math.min(selectionStart.y, selectionCurrent.y);
+        const width = Math.abs(selectionCurrent.x - selectionStart.x);
+        const height = Math.abs(selectionCurrent.y - selectionStart.y);
+
+        if (width > 5 && height > 5) {
+          onSelectionChange({
+            type: currentTool === 'select-rect' ? 'rectangle' : 'ellipse',
+            x,
+            y,
+            width,
+            height,
+          });
+        }
+      }
+      setIsSelecting(false);
+      setSelectionStart(null);
+      setSelectionCurrent(null);
+      setLassoPoints([]);
+      return;
     }
     
     if (isDrawing && activeLayer) {
