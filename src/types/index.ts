@@ -1,4 +1,19 @@
-export type Tool = 'brush' | 'eraser' | 'eyedropper' | 'text' | 'move';
+export type Tool = 'brush' | 'eraser' | 'eyedropper' | 'text' | 'move' | 'transform' | 'select-rect' | 'select-ellipse' | 'select-lasso';
+
+export type SelectionType = 'rectangle' | 'ellipse' | 'lasso';
+
+export interface Selection {
+  type: SelectionType;
+  // Pour rectangle et ellipse
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  // Pour lasso
+  points?: Point[];
+  // Données de la sélection copiée
+  imageData?: ImageData;
+}
 
 export interface Layer {
   id: string;
@@ -27,6 +42,8 @@ export interface Layer {
     scaleX: number;
     scaleY: number;
     rotation: number;
+    skewX?: number;
+    skewY?: number;
   };
 }
 
